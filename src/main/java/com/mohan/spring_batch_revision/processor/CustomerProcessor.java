@@ -1,4 +1,4 @@
-package com.mohan.spring_batch_revision.config;
+package com.mohan.spring_batch_revision.processor;
 
 import com.mohan.spring_batch_revision.entity.Customer;
 import org.springframework.batch.item.ItemProcessor;
