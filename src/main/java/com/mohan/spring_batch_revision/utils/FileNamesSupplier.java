@@ -18,7 +18,7 @@ public class FileNamesSupplier {
     }
 
     public String getCustomerLoadFileName(){
-        log.info("Searching for customer load file: {} | type: {}", CUSTOMER_LOAD_FILE_NAME, CUSTOMER_LOAD_FILE_TYPE);
+        log.info("Searching for customer load file: {} | type: {} in resources folder", CUSTOMER_LOAD_FILE_NAME, CUSTOMER_LOAD_FILE_TYPE);
         return fileInformationService.getByFileNameAndType(CUSTOMER_LOAD_FILE_NAME, CUSTOMER_LOAD_FILE_TYPE).getFileName();
     }
 }

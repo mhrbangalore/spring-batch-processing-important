@@ -42,11 +42,12 @@ public class LoadCustomersItemReaderConfig {
         DelimitedLineTokenizer lineTokenizer = new DelimitedLineTokenizer();
         lineTokenizer.setStrict(false);
         lineTokenizer.setDelimiter(",");
-        lineTokenizer.setNames("firstName", "lastName", "email", "gender", "contactNo", "country", "dob");
+        lineTokenizer.setNames("customerNo","firstName", "lastName", "email", "gender", "contactNo", "country", "dob");
         lineMapper.setLineTokenizer(lineTokenizer);
 
         lineMapper.setFieldSetMapper(fieldSet -> {
             Customer customer = new Customer();
+            customer.setCustomerNo(fieldSet.readLong("customerNo"));
             customer.setFirstName(fieldSet.readString("firstName").trim());
             customer.setLastName(fieldSet.readString("lastName").trim());
             customer.setEmail(fieldSet.readString("email").trim());

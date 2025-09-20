@@ -21,6 +21,9 @@ public class Customer {
     @Column(name = "customer_id")
     private Long customerId;
 
+    @Column(name = "customer_no", unique = true)
+    private Long customerNo;
+
     @Column(name = "first_name")
     private String firstName;
 
