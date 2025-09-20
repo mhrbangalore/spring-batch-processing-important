@@ -8,6 +8,7 @@ import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ public class LoadTransactionsItemReaderConfig {
     }
 
     @Bean(name = "transactionItemReader")
+    @Lazy
     public FlatFileItemReader<Transaction> transactionLoadIteReader(){
         FlatFileItemReader<Transaction> itemReader = new FlatFileItemReader<>();
         itemReader.setName("csv-transaction-reader");

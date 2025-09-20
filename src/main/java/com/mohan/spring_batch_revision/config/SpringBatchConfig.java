@@ -1,9 +1,13 @@
 package com.mohan.spring_batch_revision.config;
 
 import com.mohan.spring_batch_revision.entity.Customer;
+import com.mohan.spring_batch_revision.entity.Transaction;
 import com.mohan.spring_batch_revision.listeners.CustomItemWriteListener;
+import com.mohan.spring_batch_revision.processor.CustomerProcessor;
+import com.mohan.spring_batch_revision.processor.TransactionProcessor;
 import com.mohan.spring_batch_revision.repository.CustomerRepository;
 import com.mohan.spring_batch_revision.writer.CustomerRepositoryWriter;
+import com.mohan.spring_batch_revision.writer.TransactionRepositoryWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -24,20 +28,28 @@ public class SpringBatchConfig {
     private final CustomerRepository customerRepository;
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
-    private final CustomerRepositoryWriter writer;
-    private final CustomItemWriteListener writeListener;
+    private final CustomerRepositoryWriter customerRepositoryWriter;
+    private final CustomItemWriteListener customItemWriteListener;
     private final FlatFileItemReader<Customer> customerLoadItemReader;
+    private final FlatFileItemReader<Transaction> transactionLoadItemReader;
+    private final TransactionRepositoryWriter transactionRepositoryWriter;
+    private final TransactionProcessor transactionProcessor;
 
     public SpringBatchConfig(CustomerRepository customerRepository, JobRepository jobRepository,
-                             PlatformTransactionManager transactionManager, CustomerRepositoryWriter writer,
-                             CustomItemWriteListener writeListener,
-                             @Qualifier("customerItemReader") @Lazy FlatFileItemReader<Customer> customerLoadItemReader) {
+                             PlatformTransactionManager transactionManager, CustomerRepositoryWriter customerRepositoryWriter,
+                             CustomItemWriteListener customItemWriteListener,
+                             @Qualifier("customerItemReader") @Lazy FlatFileItemReader<Customer> customerLoadItemReader,
+                             @Qualifier("transactionItemReader") @Lazy FlatFileItemReader<Transaction> transactionLoadItemReader,
+                             TransactionRepositoryWriter transactionRepositoryWriter, TransactionProcessor transactionProcessor) {
         this.customerRepository = customerRepository;
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
-        this.writer = writer;
-        this.writeListener = writeListener;
+        this.customerRepositoryWriter = customerRepositoryWriter;
+        this.customItemWriteListener = customItemWriteListener;
         this.customerLoadItemReader = customerLoadItemReader;
+        this.transactionLoadItemReader = transactionLoadItemReader;
+        this.transactionRepositoryWriter = transactionRepositoryWriter;
+        this.transactionProcessor = transactionProcessor;
     }
 
     //    private LineMapper<Customer> lineMapper() {
@@ -88,20 +100,31 @@ public class SpringBatchConfig {
 
     @Bean
     public Step loadCustomersStep() {
-        return new StepBuilder("load-csv-step", jobRepository)
+        return new StepBuilder("load-customer-csv-step", jobRepository)
                 .<Customer, Customer>chunk(100, transactionManager)
                 .reader(customerLoadItemReader)
                 .processor(customerProcessor())
-                .writer(writer)
-                .listener(writeListener)
+                .writer(customerRepositoryWriter)
+                .listener(customItemWriteListener)
                 .build();
 
+    }
+
+    @Bean
+    public Step loadTransactionStep(){
+        return new StepBuilder("load-transaction-csv-step", jobRepository)
+                .<Transaction, Transaction>chunk(500, transactionManager)
+                .reader(transactionLoadItemReader)
+                .processor(transactionProcessor)
+                .writer(transactionRepositoryWriter)
+                .build();
     }
 
     @Bean
     public Job loadJob() {
         return new JobBuilder("load-job", jobRepository)
                 .flow(loadCustomersStep())
+                .next(loadTransactionStep())
                 .end().build();
     }
 
