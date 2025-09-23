@@ -2,6 +2,7 @@ package com.mohan.spring_batch_revision.writer;
 
 import com.mohan.spring_batch_revision.entity.Transaction;
 import com.mohan.spring_batch_revision.repository.TransactionRepository;
+import com.mohan.spring_batch_revision.service.CustomerService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
@@ -19,7 +20,7 @@ public class TransactionRepositoryWriter implements ItemWriter<Transaction> {
 
     @Override
     public void write(Chunk<? extends Transaction> chunk) throws Exception {
-        log.info("Starting transaction processing");
+        log.info("Starting transaction processing for {} records", chunk.size());
         transactionRepository.saveAll(chunk);
     }
 }

@@ -1,0 +1,30 @@
+<configuration>
+
+    <!-- Console output for development -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender for batch jobs -->
+    <appender name="BATCH_FILE" class="ch.qos.logback.core.FileAppender">
+        <!-- placeholder, will be overridden programmatically -->
+        <file>logs/batch-job.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>{ "timestamp": "%d{yyyy-MM-dd HH:mm:ss}", "level": "%-5level", "logger": "%logger{36}", "message": "%msg" }%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Logger for batch jobs -->
+    <logger name="com.mohan.spring_batch_revision" level="INFO" additivity="false">
+        <appender-ref ref="BATCH_FILE"/>
+    </logger>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+</configuration>

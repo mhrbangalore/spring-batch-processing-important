@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@Component
+
 @Slf4j
 public class CustomItemWriteListener implements ItemWriteListener<Customer> {
 
@@ -51,31 +51,4 @@ public class CustomItemWriteListener implements ItemWriteListener<Customer> {
             }
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }

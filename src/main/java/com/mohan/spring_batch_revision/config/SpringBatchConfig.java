@@ -3,11 +3,16 @@ package com.mohan.spring_batch_revision.config;
 import com.mohan.spring_batch_revision.entity.Customer;
 import com.mohan.spring_batch_revision.entity.Transaction;
 import com.mohan.spring_batch_revision.listeners.CustomItemWriteListener;
+import com.mohan.spring_batch_revision.listeners.CustomerSkipListener;
+import com.mohan.spring_batch_revision.loggers.ChunkLoggerListener;
+import com.mohan.spring_batch_revision.loggers.JobLoggerListener;
+import com.mohan.spring_batch_revision.loggers.StepLoggerListener;
 import com.mohan.spring_batch_revision.processor.CustomerProcessor;
 import com.mohan.spring_batch_revision.processor.TransactionProcessor;
 import com.mohan.spring_batch_revision.repository.CustomerRepository;
 import com.mohan.spring_batch_revision.writer.CustomerRepositoryWriter;
 import com.mohan.spring_batch_revision.writer.TransactionRepositoryWriter;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -29,74 +34,40 @@ public class SpringBatchConfig {
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
     private final CustomerRepositoryWriter customerRepositoryWriter;
-    private final CustomItemWriteListener customItemWriteListener;
     private final FlatFileItemReader<Customer> customerLoadItemReader;
     private final FlatFileItemReader<Transaction> transactionLoadItemReader;
     private final TransactionRepositoryWriter transactionRepositoryWriter;
     private final TransactionProcessor transactionProcessor;
+    private final CustomerSkipListener customerSkipListener;
+    private final JobLoggerListener jobLoggerListener;
+    private final StepLoggerListener stepLoggerListener;
+    private final ChunkLoggerListener chunkLoggerListener;
 
     public SpringBatchConfig(CustomerRepository customerRepository, JobRepository jobRepository,
                              PlatformTransactionManager transactionManager, CustomerRepositoryWriter customerRepositoryWriter,
-                             CustomItemWriteListener customItemWriteListener,
                              @Qualifier("customerItemReader") @Lazy FlatFileItemReader<Customer> customerLoadItemReader,
                              @Qualifier("transactionItemReader") @Lazy FlatFileItemReader<Transaction> transactionLoadItemReader,
-                             TransactionRepositoryWriter transactionRepositoryWriter, TransactionProcessor transactionProcessor) {
+                             TransactionRepositoryWriter transactionRepositoryWriter, TransactionProcessor transactionProcessor, CustomerSkipListener customerSkipListener, JobLoggerListener jobLoggerListener, StepLoggerListener stepLoggerListener, ChunkLoggerListener chunkLoggerListener) {
         this.customerRepository = customerRepository;
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.customerRepositoryWriter = customerRepositoryWriter;
-        this.customItemWriteListener = customItemWriteListener;
         this.customerLoadItemReader = customerLoadItemReader;
         this.transactionLoadItemReader = transactionLoadItemReader;
         this.transactionRepositoryWriter = transactionRepositoryWriter;
         this.transactionProcessor = transactionProcessor;
+        this.customerSkipListener = customerSkipListener;
+        this.jobLoggerListener = jobLoggerListener;
+        this.stepLoggerListener = stepLoggerListener;
+        this.chunkLoggerListener = chunkLoggerListener;
     }
 
-    //    private LineMapper<Customer> lineMapper() {
-//        DefaultLineMapper<Customer> lineMapper = new DefaultLineMapper<>();
-//
-//        DelimitedLineTokenizer lineTokenizer = new DelimitedLineTokenizer();
-//        lineTokenizer.setStrict(false);
-//        lineTokenizer.setDelimiter(",");
-//        lineTokenizer.setNames("firstName", "lastName", "email", "gender", "contactNo", "country", "dob");
-//        lineMapper.setLineTokenizer(lineTokenizer);
-//
-//        BeanWrapperFieldSetMapper<Customer> fieldSetMapper = getCustomerBeanWrapperFieldSetMapper();
-//        lineMapper.setFieldSetMapper(fieldSetMapper);
-//
-//        return lineMapper;
-//    }
-//
-//    private static BeanWrapperFieldSetMapper<Customer> getCustomerBeanWrapperFieldSetMapper() {
-//        BeanWrapperFieldSetMapper<Customer> fieldSetMapper = new BeanWrapperFieldSetMapper<>() {
-//            @Override
-//            protected void initBinder(DataBinder binder) {
-//                super.initBinder(binder);
-//                binder.registerCustomEditor(LocalDate.class,
-//                        new PropertyEditorSupport() {
-//                            @Override
-//                            public void setAsText(String text) {
-//                                setValue(LocalDate.parse(text, DateTimeFormatter.ofPattern("dd-MM-yyyy")));
-//                            }
-//                        });
-//            }
-//        };
-//        fieldSetMapper.setTargetType(Customer.class);
-//        return fieldSetMapper;
-//    }
 
     @Bean
     public CustomerProcessor customerProcessor() {
         return new CustomerProcessor();
     }
 
-//    @Bean
-//    public ItemWriter<Customer> writer(){
-//        RepositoryItemWriter<Customer> itemWriter = new RepositoryItemWriter<>();
-//        itemWriter.setRepository(customerRepository);
-//        itemWriter.setMethodName("save");
-//        return itemWriter;
-//    }
 
     @Bean
     public Step loadCustomersStep() {
@@ -105,9 +76,13 @@ public class SpringBatchConfig {
                 .reader(customerLoadItemReader)
                 .processor(customerProcessor())
                 .writer(customerRepositoryWriter)
-                .listener(customItemWriteListener)
+                .faultTolerant()
+                .skip(Exception.class)
+                .skipLimit(3000)
+                .listener(customerSkipListener)
+                .listener(stepLoggerListener)
+                .listener(chunkLoggerListener)
                 .build();
-
     }
 
     @Bean
@@ -123,6 +98,7 @@ public class SpringBatchConfig {
     @Bean
     public Job loadJob() {
         return new JobBuilder("load-job", jobRepository)
+                .listener(jobLoggerListener)
                 .flow(loadCustomersStep())
                 .next(loadTransactionStep())
                 .end().build();

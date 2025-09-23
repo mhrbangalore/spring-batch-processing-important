@@ -1,6 +1,7 @@
 package com.mohan.spring_batch_revision.controller;
 
 import com.mohan.spring_batch_revision.entity.JobStatusResponse;
+import com.mohan.spring_batch_revision.loggers.BatchLogFileSetter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.*;
@@ -30,6 +31,7 @@ public class JobController {
 
     @PostMapping("/run-customer-load")
     public ResponseEntity<JobStatusResponse> runLoadJob(){
+        BatchLogFileSetter.setBatchLogFile();
         JobParameters jobParameters = new JobParametersBuilder()
                 .addLong("startAt", System.currentTimeMillis()).toJobParameters();
         String status;

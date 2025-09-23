@@ -19,8 +19,11 @@ import java.time.LocalDateTime;
 public class CustomerError {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "customer_id")
-    private Long customerId;
+    @Column(name = "log_id")
+    private Long logId;
+
+    @Column(name = "customer_no")
+    private Long customerNo;
 
     @Column(name = "first_name")
     private String firstName;
@@ -28,7 +31,6 @@ public class CustomerError {
     @Column(name = "last_name")
     private String lastName;
 
-    @Column(unique = true)
     private String email;
 
     private String gender;
