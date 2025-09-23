@@ -1,4 +1,4 @@
-package com.mohan.spring_batch_revision.dao;
+package com.mohan.spring_batch_revision.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Data
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ErrorMessageDao {
+public class ErrorMessageDto {
 
     private String message;
 

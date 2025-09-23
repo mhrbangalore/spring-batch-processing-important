@@ -1,13 +1,13 @@
 package com.mohan.spring_batch_revision.mapper.impl;
 
-import com.mohan.spring_batch_revision.dao.FileInformationDao;
+import com.mohan.spring_batch_revision.dto.FileInformationDto;
 import com.mohan.spring_batch_revision.entity.FileInformation;
 import com.mohan.spring_batch_revision.mapper.IMapper;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Component;
 
 @Component
-public class FileInfoMapper implements IMapper<FileInformation, FileInformationDao> {
+public class FileInfoMapper implements IMapper<FileInformation, FileInformationDto> {
 
     private final ModelMapper modelMapper;
 
@@ -16,12 +16,12 @@ public class FileInfoMapper implements IMapper<FileInformation, FileInformationD
     }
 
     @Override
-    public FileInformation mapFrom(FileInformationDao fileInformationDao) {
-        return modelMapper.map(fileInformationDao, FileInformation.class);
+    public FileInformation mapFrom(FileInformationDto fileInformationDto) {
+        return modelMapper.map(fileInformationDto, FileInformation.class);
     }
 
     @Override
-    public FileInformationDao mapTo(FileInformation fileInformation) {
-        return modelMapper.map(fileInformation, FileInformationDao.class);
+    public FileInformationDto mapTo(FileInformation fileInformation) {
+        return modelMapper.map(fileInformation, FileInformationDto.class);
     }
 }

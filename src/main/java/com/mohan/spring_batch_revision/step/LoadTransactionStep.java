@@ -1,6 +1,8 @@
 package com.mohan.spring_batch_revision.step;
 
 import com.mohan.spring_batch_revision.entity.Transaction;
+import com.mohan.spring_batch_revision.loggers.ChunkLoggerListener;
+import com.mohan.spring_batch_revision.loggers.StepLoggerListener;
 import com.mohan.spring_batch_revision.processor.TransactionProcessor;
 import com.mohan.spring_batch_revision.reader.LoadTransactionsItemReaderConfig;
 import com.mohan.spring_batch_revision.writer.TransactionRepositoryWriter;
@@ -21,17 +23,21 @@ public class LoadTransactionStep {
     private final FlatFileItemReader<Transaction> transactionLoadItemReader;
     private final TransactionRepositoryWriter transactionRepositoryWriter;
     private final TransactionProcessor transactionProcessor;
+    private final StepLoggerListener stepLoggerListener;
+    private final ChunkLoggerListener chunkLoggerListener;
 
     public LoadTransactionStep(JobRepository jobRepository,
                                PlatformTransactionManager transactionManager,
                                @Qualifier("transactionItemReader") @Lazy FlatFileItemReader<Transaction> transactionLoadItemReader,
                                TransactionRepositoryWriter transactionRepositoryWriter,
-                               TransactionProcessor transactionProcessor) {
+                               TransactionProcessor transactionProcessor, StepLoggerListener stepLoggerListener, ChunkLoggerListener chunkLoggerListener) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.transactionLoadItemReader = transactionLoadItemReader;
         this.transactionRepositoryWriter = transactionRepositoryWriter;
         this.transactionProcessor = transactionProcessor;
+        this.stepLoggerListener = stepLoggerListener;
+        this.chunkLoggerListener = chunkLoggerListener;
     }
 
     public Step loadTransactionStep(){
@@ -40,6 +46,8 @@ public class LoadTransactionStep {
                 .reader(transactionLoadItemReader)
                 .processor(transactionProcessor)
                 .writer(transactionRepositoryWriter)
+                .listener(stepLoggerListener)
+                .listener(chunkLoggerListener)
                 .build();
     }
 }

@@ -1,0 +1,12 @@
+kafka:
+  bootstrap-servers: localhost:9092
+  topic: customers-topic
+
+# Producer properties (spring-kafka uses these under ProducerFactory)
+spring.kafka:
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    acks: all
+    retries: 3
+    max-in-flight: 1
