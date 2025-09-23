@@ -22,6 +22,7 @@ public class CustomerSkipListener implements SkipListener<Customer, Customer> {
     @Override
     public void onSkipInProcess(Customer customer, Throwable t) {
         System.err.println("Skipped record during process: " + customer + " due to " + t.getMessage());
+        customerErrorService.saveError(customer, t.getMessage());
     }
 
     @Override
