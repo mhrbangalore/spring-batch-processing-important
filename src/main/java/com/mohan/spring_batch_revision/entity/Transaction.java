@@ -30,7 +30,7 @@ public class Transaction {
     @Column(name = "customer_id")
     private Long customerId;
 
-    @Column(name = "unique_tran_id")
+    @Column(name = "unique_tran_id", unique = true)
     private String uniqueTranId;
 
     @Column(name = "transaction_date")

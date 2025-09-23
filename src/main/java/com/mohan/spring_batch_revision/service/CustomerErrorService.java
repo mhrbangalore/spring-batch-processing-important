@@ -24,6 +24,7 @@ public class CustomerErrorService {
                 : message;
 
         CustomerError error = CustomerError.builder()
+                .customerNo(customer.getCustomerNo())
                 .firstName(customer.getFirstName())
                 .lastName(customer.getLastName())
                 .contactNo(customer.getContactNo())
