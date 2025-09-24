@@ -29,7 +29,8 @@ public class LoadConsumerStep {
     private final PlatformTransactionManager transactionManager;
 
 
-    public LoadConsumerStep(@Qualifier("customerItemReader") @Lazy FlatFileItemReader<Customer> customerLoadItemReader, CustomerProcessor customerProcessor,
+    public LoadConsumerStep(@Qualifier("customerItemReader") @Lazy FlatFileItemReader<Customer> customerLoadItemReader,
+                            CustomerProcessor customerProcessor,
                             CustomerRepositoryWriter customerRepositoryWriter,
                             CustomerSkipListener customerSkipListener,
                             StepLoggerListener stepLoggerListener,

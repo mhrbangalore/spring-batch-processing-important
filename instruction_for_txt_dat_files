@@ -1,0 +1,679 @@
+1. Example Text File
+
+Suppose you have a text file named customers.txt:
+
+101,John,Doe,john.doe@email.com
+102,Jane,Smith,jane.smith@email.com
+103,Robert,Brown,robert.brown@email.com
+
+
+Each line represents a customer record: id, firstName, lastName, email.
+
+2. Entity Class
+@Entity
+@Table(name = "customers")
+public class Customer {
+
+    @Id
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String email;
+
+    // getters & setters
+}
+
+3. Reader (FlatFileItemReader)
+
+Spring Batch provides FlatFileItemReader to read lines from a file and map them to objects.
+
+@Bean
+public FlatFileItemReader<Customer> customerItemReader() {
+    return new FlatFileItemReaderBuilder<Customer>()
+            .name("customerItemReader")
+            .resource(new ClassPathResource("customers.txt")) // file in src/main/resources
+            .delimited()
+            .names("id", "firstName", "lastName", "email")
+            .fieldSetMapper(new BeanWrapperFieldSetMapper<>() {{
+                setTargetType(Customer.class);
+            }})
+            .build();
+}
+
+4. Processor (Optional Transformation)
+
+For example, convert email to lowercase before saving.
+
+@Component
+public class CustomerItemProcessor implements ItemProcessor<Customer, Customer> {
+
+    @Override
+    public Customer process(Customer customer) throws Exception {
+        customer.setEmail(customer.getEmail().toLowerCase());
+        return customer;
+    }
+}
+
+5. Writer (JDBC or JPA)
+
+Using Spring Data JPA:
+
+public interface CustomerRepository extends JpaRepository<Customer, Long> { }
+
+@Component
+public class CustomerItemWriter implements ItemWriter<Customer> {
+
+    private final CustomerRepository repository;
+
+    public CustomerItemWriter(CustomerRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public void write(List<? extends Customer> items) {
+        repository.saveAll(items);
+    }
+}
+
+
+Alternatively, you could use JdbcBatchItemWriter.
+
+6. Step Configuration
+@Bean
+public Step customerStep(JobRepository jobRepository,
+                         PlatformTransactionManager transactionManager,
+                         FlatFileItemReader<Customer> reader,
+                         CustomerItemProcessor processor,
+                         CustomerItemWriter writer) {
+    return new StepBuilder("customerStep", jobRepository)
+            .<Customer, Customer>chunk(10, transactionManager)
+            .reader(reader)
+            .processor(processor)
+            .writer(writer)
+            .build();
+}
+
+7. Job Configuration
+@Bean
+public Job customerJob(JobRepository jobRepository,
+                       Step customerStep) {
+    return new JobBuilder("customerJob", jobRepository)
+            .start(customerStep)
+            .build();
+}
+
+8. Running the Job
+
+Spring Boot auto-runs the job at startup if you have:
+
+spring.batch.job.enabled=true
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.hibernate.ddl-auto=create
+
+🔑 Flow Summary
+
+FlatFileItemReader → Reads customers.txt line by line.
+
+ItemProcessor → Transforms data (optional).
+
+ItemWriter → Saves into DB.
+
+Step → Defines chunk processing (read → process → write).
+
+Job → Orchestrates the step(s).
+
+1. The Reader Setup You Saw
+@Bean
+public FlatFileItemReader<Customer> customerItemReader() {
+    return new FlatFileItemReaderBuilder<Customer>()
+            .name("customerItemReader")
+            .resource(new ClassPathResource("customers.txt"))
+            .delimited()
+            .names("id", "firstName", "lastName", "email")
+            .fieldSetMapper(new BeanWrapperFieldSetMapper<>() {{
+                setTargetType(Customer.class);
+            }})
+            .build();
+}
+
+2. What Happens Internally
+
+Reads one line at a time
+Example line:
+
+101,John,Doe,john.doe@email.com
+
+
+Tokenizer splits the line
+Because we used .delimited(), Spring Batch creates a DelimitedLineTokenizer.
+
+Default delimiter is comma (,).
+
+It splits the line into tokens →
+
+["101", "John", "Doe", "john.doe@email.com"]
+
+
+Assigns names to tokens
+You declared:
+
+.names("id", "firstName", "lastName", "email")
+
+
+Now the tokens are mapped like:
+
+id = "101"
+firstName = "John"
+lastName = "Doe"
+email = "john.doe@email.com"
+
+
+FieldSetMapper converts tokens to object
+
+BeanWrapperFieldSetMapper uses reflection to match field names with your Customer class.
+
+It converts "101" (String) → Long id.
+
+Creates a populated Customer object:
+
+new Customer(101L, "John", "Doe", "john.doe@email.com");
+
+
+Returns the object to the Step
+The ItemReader<Customer> interface returns one Customer per read.
+
+3. How It Knows Where to Split?
+
+Because of this section:
+
+.delimited()
+.names("id", "firstName", "lastName", "email")
+
+
+.delimited() → tells Spring to use DelimitedLineTokenizer (default delimiter ,).
+
+.names(...) → defines the order of fields.
+
+BeanWrapperFieldSetMapper → maps those names to bean properties.
+
+4. Customization
+
+If your file was pipe-separated:
+
+101|John|Doe|john.doe@email.com
+
+
+You can configure:
+
+.delimited()
+.delimiter("|")
+.names("id", "firstName", "lastName", "email")
+
+5. Alternative: Fixed-Length File
+
+If file had fixed-length fields (e.g., first 3 chars = id, next 10 = firstName), you’d use:
+
+.fixedLength()
+.columns(new Range(1, 3), new Range(4, 13), new Range(14, 23), new Range(24, 50))
+.names("id", "firstName", "lastName", "email")
+
+
+✅ So in short:
+Reading works because Spring Batch tokenizes each line using a delimiter, assigns tokens to field names, and maps them into your domain object.
+
+What happens if there is an extra field for which we have not mapping? Like an error record-101|John|Doe|john.doe@email.com|adadad
+ChatGPT said:
+
+Excellent catch 🚀 — this is one of those “real-world” questions that often comes up in Spring Batch interviews (because production files are never perfect).
+
+Let’s take your case:
+
+101|John|Doe|john.doe@email.com|adadad
+
+
+Here, you configured the reader with:
+
+.delimited()
+.delimiter("|")
+.names("id", "firstName", "lastName", "email")
+
+
+So the reader expects 4 tokens, but it finds 5 tokens.
+
+🔍 What Actually Happens
+Case 1: Extra column present
+
+DelimitedLineTokenizer will tokenize into:
+
+[101, John, Doe, john.doe@email.com, adadad]
+
+
+It then tries to map tokens to names:
+
+id        = 101
+firstName = John
+lastName  = Doe
+email     = john.doe@email.com
+
+
+The extra token (adadad) is simply ignored because you didn’t define a mapping for it.
+No exception is thrown.
+
+👉 So by default, extra fields are discarded.
+
+Case 2: Missing a required column
+
+Example line:
+
+102|Jane|Smith
+
+
+Reader expects 4 tokens but finds only 3.
+
+Now you get an IncorrectTokenCountException:
+
+Expected 4 tokens, but found 3
+
+
+👉 Missing fields cause an error, extra fields are ignored.
+
+⚙️ How to Handle Error Records
+
+In real jobs, you usually don’t want to silently ignore bad lines. Options:
+
+Strict tokenizer (default behavior for missing fields)
+
+Extra fields are ignored, but you can override behavior with custom LineTokenizer.
+
+Custom LineTokenizer
+
+Extend DelimitedLineTokenizer and override tokenize().
+
+You can validate token count and throw a custom exception.
+
+public class StrictLineTokenizer extends DelimitedLineTokenizer {
+    @Override
+    public FieldSet tokenize(String line) {
+        FieldSet fieldSet = super.tokenize(line);
+        if (fieldSet.getFieldCount() != 4) {
+            throw new FlatFileParseException("Invalid number of fields", line, 0);
+        }
+        return fieldSet;
+    }
+}
+
+
+Skip or capture bad records
+
+Use SkipPolicy or FaultTolerantStepBuilder to skip bad lines.
+
+Or configure a SkipListener to log/write invalid records to an “error file”.
+
+.faultTolerant()
+.skip(FlatFileParseException.class)
+.skipLimit(100)
+
+
+Write error lines separately
+
+Use a CompositeItemWriter → one writer to DB, another to an “error table/file”.
+
+✅ Summary for your example:
+
+Extra fields → ignored by default (no error).
+
+Missing fields → IncorrectTokenCountException.
+
+In production → best practice is to write a custom tokenizer or use skip/error handling to capture bad records instead of silently ignoring them.
+
+Would you like me to show you a full working example with SkipPolicy so that all bad lines (like your extra-field record) get logged into a separate file while good ones go into the DB?
+
+You said:
+Provide more information about this along with sample example and full implementation-
+Alternative: Fixed-Length File
+
+If file had fixed-length fields (e.g., first 3 chars = id, next 10 = firstName), you’d use:
+
+.fixedLength()
+.columns(new Range(1, 3), new Range(4, 13), new Range(14, 23), new Range(24, 50))
+.names("id", "firstName", "lastName", "email")
+ChatGPT said:
+
+Perfect 👍 — let’s go deep into fixed-length file handling in Spring Batch.
+This is important because not all flat files are CSV/pipe-delimited. Many legacy systems (especially in banking/insurance) still use fixed-length records.
+
+1. Example Fixed-Length File
+
+Suppose you have a text file customers-fixed.txt like this:
+
+101John      Doe       john.doe@email.com
+102Jane      Smith     jane.smith@email.com
+103Robert    Brown     robert.brown@email.com
+
+
+👉 Notice:
+
+First 3 chars = id
+
+Next 10 chars = firstName (padded with spaces)
+
+Next 10 chars = lastName (padded with spaces)
+
+Next 30 chars = email
+
+2. Entity Class
+@Entity
+@Table(name = "customers")
+public class Customer {
+
+    @Id
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String email;
+
+    // getters, setters, toString
+}
+
+3. Reader with Fixed-Length Configuration
+@Bean
+public FlatFileItemReader<Customer> customerFixedFileReader() {
+    return new FlatFileItemReaderBuilder<Customer>()
+            .name("customerFixedFileReader")
+            .resource(new ClassPathResource("customers-fixed.txt"))
+            .fixedLength()
+            .columns(
+                new Range(1, 3),    // id → chars 1-3
+                new Range(4, 13),   // firstName → chars 4-13
+                new Range(14, 23),  // lastName → chars 14-23
+                new Range(24, 53)   // email → chars 24-53
+            )
+            .names("id", "firstName", "lastName", "email")
+            .fieldSetMapper(new BeanWrapperFieldSetMapper<>() {{
+                setTargetType(Customer.class);
+            }})
+            .build();
+}
+
+🔑 How it works:
+
+.fixedLength() tells Spring Batch to use FixedLengthTokenizer.
+
+.columns(new Range(1,3)) → defines start and end positions (inclusive).
+
+.names(...) → maps each token to a field.
+
+Spaces are not automatically trimmed, so you often combine with a processor to clean values.
+
+4. Processor (to trim extra spaces)
+@Component
+public class CustomerItemProcessor implements ItemProcessor<Customer, Customer> {
+    @Override
+    public Customer process(Customer customer) {
+        customer.setFirstName(customer.getFirstName().trim());
+        customer.setLastName(customer.getLastName().trim());
+        customer.setEmail(customer.getEmail().trim().toLowerCase());
+        return customer;
+    }
+}
+
+5. Writer (Using JPA)
+@Component
+public class CustomerItemWriter implements ItemWriter<Customer> {
+
+    private final CustomerRepository repository;
+
+    public CustomerItemWriter(CustomerRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public void write(List<? extends Customer> customers) {
+        repository.saveAll(customers);
+    }
+}
+
+6. Step and Job Configuration
+@Bean
+public Step customerFixedStep(JobRepository jobRepository,
+                              PlatformTransactionManager transactionManager,
+                              FlatFileItemReader<Customer> customerFixedFileReader,
+                              CustomerItemProcessor processor,
+                              CustomerItemWriter writer) {
+    return new StepBuilder("customerFixedStep", jobRepository)
+            .<Customer, Customer>chunk(5, transactionManager)
+            .reader(customerFixedFileReader)
+            .processor(processor)
+            .writer(writer)
+            .build();
+}
+
+@Bean
+public Job customerFixedJob(JobRepository jobRepository, Step customerFixedStep) {
+    return new JobBuilder("customerFixedJob", jobRepository)
+            .start(customerFixedStep)
+            .build();
+}
+
+7. Running Example
+
+Input (customers-fixed.txt):
+
+101John      Doe       john.doe@email.com
+102Jane      Smith     jane.smith@email.com
+
+
+Output (in DB customers table):
+
+id	firstName	lastName	email
+101	John	Doe	john.doe@email.com
+
+102	Jane	Smith	jane.smith@email.com
+8. Common Pitfalls
+
+Off-by-one errors in Range
+
+Ranges are inclusive (start=1, end=3 means chars 1,2,3).
+
+If you mismatch, data will shift.
+
+Spaces in fields
+
+Fixed-length records often pad values with spaces.
+
+Always use .trim() in processor.
+
+Line length validation
+
+If one record is shorter, FixedLengthTokenizer throws exception.
+
+You can handle using a SkipPolicy.
+
+✅ Summary
+
+Fixed-length files require .fixedLength() with .columns(Range...).
+
+Tokens are extracted based on character positions, not delimiters.
+
+Processor usually trims and normalizes data before writing to DB.
+
+Would you like me to also show you how to log/skip bad records if the line length doesn’t match the expected fixed-length format (e.g., a line is truncated)?
+
+You said:
+Imagine if the file does not separate by lines, instead it is continuous like-
+
+01374355789Mohan Kumar 19940115Brighton United Kingdom BN2 1RD01374355790ABCDE Kumar 19990217Brighton United Kingdom BN2 1RH
+01- a type to identify the data in a file(01-new demograhic data, 02-maintenance data like this) Next 9 characters are for card number Next 18 are for full name, next 8 are for DOB with YYYYMMDD format and then next 16 for city name, next 18 for country name and then next 7 for post code, and then the same continues for other customer.
+
+How can you handle this?
+ChatGPT said:
+
+Ah, now you’ve described a true legacy-style fixed-length stream file 💯 — no line breaks, just one continuous string of records glued together.
+
+This is very common in mainframe data feeds (banking, payments, telecom). Spring Batch can still handle it, but you need to control the “line” boundaries yourself.
+
+🔑 The Problem
+
+Normally, Spring Batch FlatFileItemReader assumes each line = one record.
+
+Here, you have no line breaks — the file is a continuous block.
+
+Example (simplified, without line breaks):
+
+01374355789Mohan Kumar     19940115Brighton        United Kingdom     BN2 1RD
+01374355790ABCDE Kumar     19990217Brighton        United Kingdom     BN2 1RH
+
+✅ Approaches
+Approach 1: Use FixedLengthTokenizer but preprocess stream into pseudo-lines
+
+Each record has a fixed total length.
+Let’s calculate:
+
+Field	Length
+Type	2
+Card Number	9
+Full Name	18
+DOB	8
+City	16
+Country	18
+Postcode	7
+Total	78
+
+So each record is 78 characters.
+
+Wrap the file into an InputStream and make it behave like each 78-char chunk is a line.
+
+👉 Spring Batch trick: use FixedLengthTokenizer with chunked lines.
+
+@Bean
+public FlatFileItemReader<CustomerRecord> fixedStreamReader() {
+    return new FlatFileItemReaderBuilder<CustomerRecord>()
+            .name("fixedStreamReader")
+            .resource(new ClassPathResource("customer-stream.txt"))
+            .fixedLength()
+            .columns(
+                new Range(1, 2),    // type
+                new Range(3, 11),   // cardNumber
+                new Range(12, 29),  // fullName
+                new Range(30, 37),  // dob
+                new Range(38, 53),  // city
+                new Range(54, 71),  // country
+                new Range(72, 78)   // postcode
+            )
+            .names("type", "cardNumber", "fullName", "dob", "city", "country", "postcode")
+            .fieldSetMapper(new BeanWrapperFieldSetMapper<>() {{
+                setTargetType(CustomerRecord.class);
+            }})
+            .build();
+}
+
+
+👉 But: this only works if your file already has line breaks.
+If not, you need custom line reading.
+
+Approach 2: Custom RecordSeparatorPolicy
+
+Spring Batch allows you to define how to separate records.
+
+@Bean
+public FlatFileItemReader<CustomerRecord> fixedStreamReader() {
+    FlatFileItemReader<CustomerRecord> reader = new FlatFileItemReader<>();
+    reader.setResource(new ClassPathResource("customer-stream.txt"));
+
+    // Each "line" is 78 characters
+    reader.setRecordSeparatorPolicy(new RecordSeparatorPolicy() {
+        @Override
+        public boolean isEndOfRecord(String record) {
+            return record.length() == 78;
+        }
+
+        @Override
+        public String postProcess(String record) {
+            return record;
+        }
+
+        @Override
+        public String preProcess(String record) {
+            return record;
+        }
+    });
+
+    // Use FixedLengthTokenizer
+    DefaultLineMapper<CustomerRecord> lineMapper = new DefaultLineMapper<>();
+    FixedLengthTokenizer tokenizer = new FixedLengthTokenizer();
+    tokenizer.setColumns(
+        new Range(1, 2),
+        new Range(3, 11),
+        new Range(12, 29),
+        new Range(30, 37),
+        new Range(38, 53),
+        new Range(54, 71),
+        new Range(72, 78)
+    );
+    tokenizer.setNames("type", "cardNumber", "fullName", "dob", "city", "country", "postcode");
+
+    lineMapper.setLineTokenizer(tokenizer);
+    lineMapper.setFieldSetMapper(new BeanWrapperFieldSetMapper<>() {{
+        setTargetType(CustomerRecord.class);
+    }});
+
+    reader.setLineMapper(lineMapper);
+
+    return reader;
+}
+
+
+Here:
+
+The RecordSeparatorPolicy ensures the reader treats every 78 characters as one record, even if no newline exists.
+
+Then FixedLengthTokenizer extracts fields.
+
+Approach 3: Custom ItemReader
+
+If the file is very large or has mixed record types (e.g., 01 for demographics, 02 for maintenance), sometimes it’s cleaner to implement your own ItemReader.
+
+@Component
+public class FixedStreamItemReader implements ItemReader<CustomerRecord> {
+
+    private BufferedReader reader;
+    private static final int RECORD_LENGTH = 78;
+
+    public FixedStreamItemReader() throws IOException {
+        this.reader = new BufferedReader(new FileReader("src/main/resources/customer-stream.txt"));
+    }
+
+    @Override
+    public CustomerRecord read() throws Exception {
+        char[] buffer = new char[RECORD_LENGTH];
+        int read = reader.read(buffer);
+        if (read == -1) {
+            return null; // end of file
+        }
+
+        String record = new String(buffer);
+
+        CustomerRecord customer = new CustomerRecord();
+        customer.setType(record.substring(0, 2));
+        customer.setCardNumber(record.substring(2, 11));
+        customer.setFullName(record.substring(11, 29).trim());
+        customer.setDob(record.substring(29, 37));
+        customer.setCity(record.substring(37, 53).trim());
+        customer.setCountry(record.substring(53, 71).trim());
+        customer.setPostcode(record.substring(71, 78).trim());
+
+        return customer;
+    }
+}
+
+
+👉 This gives you full control. You can also branch logic based on the type field (01 vs 02).
+
+✅ Which One Should You Use?
+
+If records are same length, only missing newlines → use RecordSeparatorPolicy.
+
+If file is complex, mixed record types → write a custom ItemReader.
